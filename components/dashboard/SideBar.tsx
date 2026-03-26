@@ -59,11 +59,6 @@ const navItems = [
     icon: Activity,
   },
   {
-    title: "Logs do Servidor",
-    url: "/logs",
-    icon: Terminal,
-  },
-  {
     title: "Configurações",
     url: "/configuracoes",
     icon: Settings,
@@ -72,6 +67,11 @@ const navItems = [
     title: "Administração",
     url: "/administracao",
     icon: Shield,
+  },
+  {
+    title: "Logs do Servidor",
+    url: "/administracao/logs",
+    icon: Terminal,
   },
 ];
 
