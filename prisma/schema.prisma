@@ -8,6 +8,9 @@
  * - Associado        : dados cadastrais do associado (CPF, nome, contato, cooperativa)
  * - AssociadoStatus  : histórico de situações — permite rastrear mudanças ao longo do tempo
  * - Log              : logs unificados de todas as automações do sistema
+ * - Feriado          : feriados nacionais cadastrados (usados pelo scheduler para dias úteis)
+ * - Consultor        : consultores do PowerCRM para matching com voluntários da Hinova
+ * - Configuracao     : configurações do sistema (notificações, agendamento, etc.)
  */
 
 generator client {
@@ -115,6 +118,58 @@ model Log {
   @@index([criadoEm])
   @@index([cpfAssociado])
   @@map("logs")
+}
+
+// ─── Feriado ───────────────────────────────────────────────────────────────────────────────
+// Feriados nacionais cadastrados.
+// Usados pelo scheduler para determinar dias úteis e evitar execuções em feriados.
+
+model Feriado {
+  id        String   @id @default(cuid())
+  // Data no formato ISO (YYYY-MM-DD) — sem hora para evitar problemas de timezone
+  data      DateTime @db.Date
+  descricao String
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([data]) // Não permite duplicar o mesmo feriado
+  @@index([data])
+  @@map("feriados")
+}
+
+// ─── Consultor ─────────────────────────────────────────────────────────────────────────────
+// Consultores do PowerCRM cadastrados manualmente.
+// Usados para matching automático com voluntários da Hinova na criação de leads.
+
+model Consultor {
+  id              String  @id @default(cuid())
+  nome            String
+  email           String  @unique
+  codigoPowerCRM  String  @map("codigo_power_crm")
+  idCooperativa   String  @map("id_cooperativa")
+  ativo           Boolean @default(true)
+
+  criadoEm  DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([ativo])
+  @@index([idCooperativa])
+  @@map("consultores")
+}
+
+// ─── Configuracao ──────────────────────────────────────────────────────────────────────────
+// Configurações do sistema armazenadas no banco.
+// Usa o padrão chave-valor para flexibilidade.
+// Chave é única — usar upsert para atualizar.
+
+model Configuracao {
+  id    String @id @default(cuid())
+  chave String @unique
+  valor String // JSON serializado para suportar qualquer tipo
+
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("configuracoes")
 }
 
 // ─── Enums ─────────────────────────────────────────────────────────────────────────────────
