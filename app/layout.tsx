@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins } from "next/font/google";
 import "./globals.css";
 import { SideBar } from "@/components/dashboard/SideBar";
+import { Header } from "@/components/dashboard/Header";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
@@ -15,8 +16,8 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Automações",
-  description: "Ferramenta de Automações",
+  title: "Automações — Alpha Nacional",
+  description: "Plataforma de automações da Alpha Nacional",
 };
 
 export default function RootLayout({
@@ -35,7 +36,10 @@ export default function RootLayout({
         >
           <SidebarProvider>
             <SideBar />
-            <SidebarInset>{children}</SidebarInset>
+            <SidebarInset>
+              <Header />
+              <main className="flex-1">{children}</main>
+            </SidebarInset>
           </SidebarProvider>
           {/* Toast global — disponível em todas as páginas */}
           <Toaster richColors position="top-right" />

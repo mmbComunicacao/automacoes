@@ -204,27 +204,28 @@ export default function InativosPage() {
       {/* Cabeçalho */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Clientes Inativos</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight">Clientes Inativos</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Monitoramento automático de clientes que mudaram para situação inativa
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={buscarMetricas}
             disabled={carregando}
-            title="Atualizar métricas"
+            className="gap-2"
           >
-            <RefreshCw className={`h-4 w-4 ${carregando ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${carregando ? "animate-spin" : ""}`} />
+            Atualizar
           </Button>
           <Badge className="gap-1.5 bg-blue-600 text-white hover:bg-blue-700">
-            <Activity className="h-3 w-3" />
+            <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
             Ativo
           </Badge>
-          <Button onClick={abrirModal} className="gap-2">
-            <Play className="h-4 w-4" />
+          <Button onClick={abrirModal} className="gap-2 bg-blue-600 hover:bg-blue-700">
+            <Play className="h-3.5 w-3.5" />
             Executar Agora
           </Button>
         </div>
@@ -235,12 +236,14 @@ export default function InativosPage() {
         <MetricasSkeleton />
       ) : (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <Card>
+          <Card className="border-l-4 border-l-muted">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total de Notificações
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Total
               </CardTitle>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">{metricas?.total ?? 0}</p>
@@ -248,12 +251,14 @@ export default function InativosPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-emerald-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Notificações Enviadas
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Enviadas
               </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-emerald-500">{metricas?.sucesso ?? 0}</p>
@@ -261,10 +266,12 @@ export default function InativosPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-red-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Falhas</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Falhas</CardTitle>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950">
+                <XCircle className="h-4 w-4 text-red-500" />
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold text-red-500">{metricas?.falhas ?? 0}</p>
@@ -272,12 +279,14 @@ export default function InativosPage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="border-l-4 border-l-blue-500">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Controle de Duplicidade
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                Duplicidade
               </CardTitle>
-              <Clock className="h-4 w-4 text-muted-foreground" />
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950">
+                <Clock className="h-4 w-4 text-blue-500" />
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-3xl font-bold">{metricas?.duplicatas ?? 0}</p>

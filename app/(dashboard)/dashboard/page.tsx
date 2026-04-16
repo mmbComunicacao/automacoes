@@ -210,23 +210,24 @@ export default function DashboardPage() {
       {/* Cabeçalho */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             Visão geral de todas as automações do sistema
           </p>
         </div>
         <Button
           variant="outline"
-          size="icon"
+          size="sm"
           onClick={buscarMetricas}
           disabled={carregando}
-          title="Atualizar dados"
+          className="gap-2"
         >
           {carregando ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
           ) : (
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-3.5 w-3.5" />
           )}
+          Atualizar
         </Button>
       </div>
 
@@ -237,12 +238,12 @@ export default function DashboardPage() {
           return (
             <Card
               key={modulo.id}
-              className="group relative overflow-hidden transition-shadow hover:shadow-md"
+              className="group relative overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5"
             >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${modulo.iconBg}`}>
+                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${modulo.iconBg} shadow-sm`}>
                       <Icon className={`h-5 w-5 ${modulo.iconColor}`} />
                     </div>
                     <div>
@@ -250,16 +251,20 @@ export default function DashboardPage() {
                       <p className="text-xs text-muted-foreground">{modulo.descricao}</p>
                     </div>
                   </div>
-                  <Link href={modulo.href} className="text-muted-foreground transition-colors hover:text-foreground">
-                    <ArrowRight className="h-4 w-4" />
+                  <Link
+                    href={modulo.href}
+                    className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary"
+                  >
+                    Ver detalhes
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-muted-foreground">Status</span>
-                  <Badge className="gap-1 bg-blue-600 text-white hover:bg-blue-700">
-                    <Activity className="h-3 w-3" />
+                  <Badge className="gap-1.5 bg-blue-600 text-white hover:bg-blue-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-white/80 animate-pulse" />
                     {modulo.status}
                   </Badge>
                 </div>
@@ -330,10 +335,12 @@ export default function DashboardPage() {
           Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
         ) : (
           <>
-            <Card>
+            <Card className="border-l-4 border-l-muted">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Geral</CardTitle>
-                <Activity className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Geral</CardTitle>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
+                  <Activity className="h-4 w-4 text-muted-foreground" />
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold">{dados?.total ?? 0}</p>
@@ -341,10 +348,12 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-l-4 border-l-emerald-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Sucesso Total</CardTitle>
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Sucesso Total</CardTitle>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 dark:bg-emerald-950">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-emerald-500">{dados?.sucesso ?? 0}</p>
@@ -352,10 +361,12 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-l-4 border-l-red-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Falhas Totais</CardTitle>
-                <XCircle className="h-4 w-4 text-red-500" />
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Falhas Totais</CardTitle>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-red-500">{dados?.falhas ?? 0}</p>
@@ -363,10 +374,12 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-l-4 border-l-blue-500">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Taxa de Sucesso</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-500" />
+                <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Taxa de Sucesso</CardTitle>
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 dark:bg-blue-950">
+                  <TrendingUp className="h-4 w-4 text-blue-500" />
+                </div>
               </CardHeader>
               <CardContent>
                 <p className="text-3xl font-bold text-blue-500">{dados?.taxaSucesso ?? 0}%</p>
