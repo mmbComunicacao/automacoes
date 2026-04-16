@@ -1,0 +1,219 @@
+/**
+ * schema.prisma — Prisma 7
+ *
+ * No Prisma 7, a datasource é definida no prisma.config.ts.
+ * Este arquivo contém apenas o generator e os models.
+ *
+ * Tabelas:
+ * - Associado        : dados cadastrais do associado (CPF, nome, contato, cooperativa)
+ * - AssociadoStatus  : histórico de situações — permite rastrear mudanças ao longo do tempo
+ * - Log              : logs unificados de todas as automações do sistema
+ * - Feriado          : feriados nacionais cadastrados (usados pelo scheduler para dias úteis)
+ * - Consultor        : consultores do PowerCRM para matching com voluntários da Hinova
+ * - Configuracao     : configurações do sistema (notificações, agendamento, etc.)
+ */
+
+generator client {
+  provider = "prisma-client"
+  // Saída tipada gerada em lib/generated/prisma (padrão Prisma 7)
+  output   = "../lib/generated/prisma"
+}
+
+// O bloco datasource é obrigatório para o Prisma detectar o provider.
+// A URL de conexão é gerenciada pelo prisma.config.ts (Prisma 7).
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Associado ──────────────────────────────────────────────────────────────────────────────
+// Dados cadastrais do associado vindos da Hinova.
+// O CPF é a chave de negócio — único e imutável.
+
+model Associado {
+  id                String  @id @default(cuid())
+  cpf               String  @unique
+  nome              String
+  email             String?
+  telefoneCelular   String? @map("telefone_celular")
+  codigoCooperativa String? @map("codigo_cooperativa")
+
+  // Histórico de situações do associado
+  statusHistorico AssociadoStatus[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("associados")
+}
+
+// ─── AssociadoStatus ────────────────────────────────────────────────────────────────
+// Histórico de situações do associado.
+// Cada registro representa um estado em um momento específico.
+// Isso permite rastrear quando o associado ficou inativo, inadimplente, etc.
+
+model AssociadoStatus {
+  id          String @id @default(cuid())
+  associadoId String @map("associado_id")
+
+  // Situação cadastral (ex: ATIVO, INATIVO, CANCELADO, SUSPENSO)
+  situacao SituacaoAssociado
+
+  // Situação financeira (ex: ADIMPLENTE, INADIMPLENTE)
+  situacaoFinanceira SituacaoFinanceira @map("situacao_financeira")
+
+  // Fonte da informação (ex: HINOVA, MANUAL)
+  fonte String @default("HINOVA")
+
+  // Observações adicionais (ex: motivo da mudança)
+  observacao String?
+
+  registradoEm DateTime @default(now()) @map("registrado_em")
+
+  // Relacionamento com Associado (cascade delete)
+  associado Associado @relation(fields: [associadoId], references: [id], onDelete: Cascade)
+
+  @@index([associadoId])
+  @@index([situacao])
+  @@index([situacaoFinanceira])
+  @@map("associado_status")
+}
+
+// ─── Log ───────────────────────────────────────────────────────────────────────────────────
+// Tabela unificada de logs do sistema.
+// Todos os eventos de todas as automações são registrados aqui.
+// A separação na tela é feita filtrando por `automacao` e `integracao`.
+
+model Log {
+  id String @id @default(cuid())
+
+  // Qual automação gerou o log (ex: INATIVOS, INADIMPLENTES)
+  automacao AutomacaoTipo
+
+  // Qual integração foi usada (ex: HINOVA, POWERCRM, SISTEMA)
+  integracao IntegracaoTipo
+
+  // Nível do log
+  nivel NivelLog
+
+  // Mensagem principal do log
+  mensagem String
+
+  // Dados extras em JSON (ex: payload da requisição, resposta da API)
+  detalhes Json?
+
+  // CPF do associado relacionado ao log (quando aplicável)
+  cpfAssociado String? @map("cpf_associado")
+
+  // Código da cotação no PowerCRM (quando aplicável)
+  quotationCode String? @map("quotation_code")
+
+  // Indica se foi uma execução manual (via botão) ou automática (scheduler)
+  execucaoManual Boolean @default(false) @map("execucao_manual")
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@index([automacao])
+  @@index([integracao])
+  @@index([nivel])
+  @@index([criadoEm])
+  @@index([cpfAssociado])
+  @@map("logs")
+}
+
+// ─── Feriado ───────────────────────────────────────────────────────────────────────────────
+// Feriados nacionais cadastrados.
+// Usados pelo scheduler para determinar dias úteis e evitar execuções em feriados.
+
+model Feriado {
+  id        String   @id @default(cuid())
+  // Data no formato ISO (YYYY-MM-DD) — sem hora para evitar problemas de timezone
+  data      DateTime @db.Date
+  descricao String
+
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@unique([data]) // Não permite duplicar o mesmo feriado
+  @@index([data])
+  @@map("feriados")
+}
+
+// ─── Consultor ─────────────────────────────────────────────────────────────────────────────
+// Consultores do PowerCRM cadastrados manualmente.
+// Usados para matching automático com voluntários da Hinova na criação de leads.
+
+model Consultor {
+  id              String  @id @default(cuid())
+  nome            String
+  email           String  @unique
+  codigoPowerCRM  String  @map("codigo_power_crm")
+  idCooperativa   String  @map("id_cooperativa")
+  ativo           Boolean @default(true)
+
+  criadoEm  DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@index([ativo])
+  @@index([idCooperativa])
+  @@map("consultores")
+}
+
+// ─── Configuracao ──────────────────────────────────────────────────────────────────────────
+// Configurações do sistema armazenadas no banco.
+// Usa o padrão chave-valor para flexibilidade.
+// Chave é única — usar upsert para atualizar.
+
+model Configuracao {
+  id    String @id @default(cuid())
+  chave String @unique
+  valor String // JSON serializado para suportar qualquer tipo
+
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  @@map("configuracoes")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────────────────────
+
+enum SituacaoAssociado {
+  ATIVO
+  INATIVO
+  CANCELADO
+  SUSPENSO
+  PENDENTE
+
+  @@map("situacao_associado")
+}
+
+enum SituacaoFinanceira {
+  ADIMPLENTE
+  INADIMPLENTE
+  EM_NEGOCIACAO
+  DESCONHECIDA
+
+  @@map("situacao_financeira")
+}
+
+enum AutomacaoTipo {
+  INATIVOS
+  INADIMPLENTES
+  SISTEMA // logs gerais do sistema (inicialização, erros críticos, etc.)
+
+  @@map("automacao_tipo")
+}
+
+enum IntegracaoTipo {
+  HINOVA   // API da Hinova (ERP)
+  POWERCRM // API do PowerCRM
+  SISTEMA  // operações internas (sem integração externa)
+
+  @@map("integracao_tipo")
+}
+
+enum NivelLog {
+  INFO
+  SUCESSO
+  AVISO
+  ERRO
+
+  @@map("nivel_log")
+}

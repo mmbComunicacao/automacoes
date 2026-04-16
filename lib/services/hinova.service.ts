@@ -20,6 +20,14 @@ function getBaseUrl(): string {
   return process.env.HINOVA_API_URL ?? "https://api.hinova.com.br/api/sga/v2";
 }
 
+/**
+ * Remove qualquer caractere não numérico do CPF ou código do associado.
+ * A API Hinova exige somente dígitos — pontos, traços e espaços causam erro 406.
+ */
+function sanitizarCpfOuCodigo(valor: string): string {
+  return valor.replace(/\D/g, "");
+}
+
 interface BuscarAlteracoesAssociadoPayload {
   data_inicial: string;
   data_final: string;
@@ -123,15 +131,18 @@ interface BuscarAssociadoResponse {
 interface BuscarAssociadosInativosResponse { associados: BuscarAssociadoResponse[] }
 
 // --- Funções auxiliares ---
-async function buscarAlteracoesAssociado(dados: BuscarAlteracoesAssociadoFormData): Promise<BuscarAlteracoesAssociadoResponse[]> {
-  // Today precisa estar no formato DD/MM/YYYY
-  const today = new Date(); 
-  const dataFormatada = today.toLocaleDateString('pt-BR');
+
+async function buscarAlteracoesAssociado(
+  dados: BuscarAlteracoesAssociadoFormData
+): Promise<BuscarAlteracoesAssociadoResponse[]> {
+  // Data precisa estar no formato DD/MM/YYYY
+  const today = new Date();
+  const dataFormatada = today.toLocaleDateString("pt-BR");
 
   const payload: BuscarAlteracoesAssociadoPayload = {
     data_inicial: dados.data_inicial ?? dataFormatada,
     data_final: dados.data_final ?? dataFormatada,
-    campos: dados.campos
+    campos: dados.campos,
   };
 
   const res = await fetch(`${getBaseUrl()}/listar/alteracao-associados/`, {
@@ -145,9 +156,12 @@ async function buscarAlteracoesAssociado(dados: BuscarAlteracoesAssociadoFormDat
     throw new Error(`[Hinova] buscarAlteracoesAssociado falhou (${res.status}): ${body}`);
   }
 
-  const data = await res.json();
+  const data: BuscarAlteracoesAssociadoResponse[] = await res.json();
 
-  // 
+  // Nenhuma alteração no período — retorna lista vazia sem lançar erro
+  if (!Array.isArray(data) || data.length === 0) {
+    return [];
+  }
 
   if (!data[0].codigo_alteracao || !data[0].codigo_associado) {
     throw new Error(
@@ -155,17 +169,21 @@ async function buscarAlteracoesAssociado(dados: BuscarAlteracoesAssociadoFormDat
     );
   }
 
-  // Retornar lista de CPFs que tiveram alteração de código_situacao para 2 (inativo)
-  const cpfs = data.filter((item: BuscarAlteracoesAssociadoResponse) => item.valor_posterior === "2").map((item: BuscarAlteracoesAssociadoResponse) => item.cpf_associado);
-
-  return cpfs;
-
+  // Retornar apenas os registros onde a situação mudou para "2" (inativo)
+  return data.filter((item) => item.valor_posterior === "2");
 }
 
-async function buscarAssociado (cpf: string): Promise<BuscarAssociadoResponse> {
-  const res = await fetch(`${getBaseUrl()}/associado/buscar/${cpf}`, {
+async function buscarAssociado(cpf: string): Promise<BuscarAssociadoResponse> {
+  // Garante que apenas dígitos são enviados — evita erro 406 da Hinova
+  const cpfSanitizado = sanitizarCpfOuCodigo(cpf);
+
+  if (!cpfSanitizado) {
+    throw new Error(`[Hinova] buscarAssociado: CPF inválido após sanitização — valor original: "${cpf}"`);
+  }
+
+  const res = await fetch(`${getBaseUrl()}/associado/buscar/${cpfSanitizado}`, {
     method: "GET",
-    headers: getHeaders()
+    headers: getHeaders(),
   });
 
   if (!res.ok) {
@@ -173,16 +191,32 @@ async function buscarAssociado (cpf: string): Promise<BuscarAssociadoResponse> {
     throw new Error(`[Hinova] buscarAssociado falhou (${res.status}): ${body}`);
   }
 
-  const data = await res.json();
+  const data: BuscarAssociadoResponse = await res.json();
 
   return data;
 }
 
-// async function buscarBoletosInadimplentes() {}
 // --- Funções da API ---
-export async function buscarAssociadosInativos(data_inicial: string, data_final: string): Promise<BuscarAssociadosInativosResponse> {
-  const associados = await buscarAlteracoesAssociado({ data_inicial, data_final, campos: ["codigo_situacao"] });
-  const associadosInativos = await Promise.all(associados.map((associado) => buscarAssociado(associado.cpf_associado)));
+
+export async function buscarAssociadosInativos(
+  data_inicial: string,
+  data_final: string
+): Promise<BuscarAssociadosInativosResponse> {
+  const alteracoes = await buscarAlteracoesAssociado({
+    data_inicial,
+    data_final,
+    campos: ["codigo_situacao"],
+  });
+
+  // Nenhum inativo no período — retorna lista vazia sem chamar buscarAssociado
+  if (alteracoes.length === 0) {
+    return { associados: [] };
+  }
+
+  const associadosInativos = await Promise.all(
+    alteracoes.map((alteracao) => buscarAssociado(alteracao.cpf_associado))
+  );
+
   return { associados: associadosInativos };
 }
 

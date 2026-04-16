@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Shield,
   CalendarDays,
@@ -10,6 +10,8 @@ import {
   Pencil,
   UserPlus,
   Loader2,
+  RefreshCw,
+  AlertCircle,
 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -36,7 +39,7 @@ import {
 
 interface Feriado {
   id: string;
-  data: string;
+  data: string; // ISO string do banco
   descricao: string;
 }
 
@@ -52,7 +55,7 @@ interface Consultor {
 // --- Schemas de validação ---
 
 const feriadoSchema = z.object({
-  data: z.string().min(1, "Data obrigatória"),
+  data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida"),
   descricao: z.string().min(2, "Descrição obrigatória"),
 });
 
@@ -66,138 +69,226 @@ const consultorSchema = z.object({
 type FeriadoFormData = z.infer<typeof feriadoSchema>;
 type ConsultorFormData = z.infer<typeof consultorSchema>;
 
-// --- Feriados nacionais pré-definidos ---
-const feriadosBrasil2025: Omit<Feriado, "id">[] = [
-  { data: "01/01/2025", descricao: "Confraternização Universal" },
-  { data: "04/03/2025", descricao: "Carnaval" },
-  { data: "05/03/2025", descricao: "Quarta-feira de Cinzas" },
-  { data: "18/04/2025", descricao: "Sexta-feira Santa" },
-  { data: "21/04/2025", descricao: "Tiradentes" },
-  { data: "01/05/2025", descricao: "Dia do Trabalho" },
-  { data: "19/06/2025", descricao: "Corpus Christi" },
-  { data: "07/09/2025", descricao: "Independência do Brasil" },
-  { data: "12/10/2025", descricao: "Nossa Senhora Aparecida" },
-  { data: "02/11/2025", descricao: "Finados" },
-  { data: "15/11/2025", descricao: "Proclamação da República" },
-  { data: "25/12/2025", descricao: "Natal" },
+// --- Feriados nacionais pré-definidos para importação rápida ---
+// Estes são dados estáticos de referência — não são mocks de banco
+const FERIADOS_2025 = [
+  { data: "2025-01-01", descricao: "Confraternização Universal" },
+  { data: "2025-03-04", descricao: "Carnaval" },
+  { data: "2025-03-05", descricao: "Quarta-feira de Cinzas" },
+  { data: "2025-04-18", descricao: "Sexta-feira Santa" },
+  { data: "2025-04-21", descricao: "Tiradentes" },
+  { data: "2025-05-01", descricao: "Dia do Trabalho" },
+  { data: "2025-06-19", descricao: "Corpus Christi" },
+  { data: "2025-09-07", descricao: "Independência do Brasil" },
+  { data: "2025-10-12", descricao: "Nossa Senhora Aparecida" },
+  { data: "2025-11-02", descricao: "Finados" },
+  { data: "2025-11-15", descricao: "Proclamação da República" },
+  { data: "2025-12-25", descricao: "Natal" },
 ];
 
-const feriadosBrasil2026: Omit<Feriado, "id">[] = [
-  { data: "01/01/2026", descricao: "Confraternização Universal" },
-  { data: "17/02/2026", descricao: "Carnaval" },
-  { data: "18/02/2026", descricao: "Quarta-feira de Cinzas" },
-  { data: "03/04/2026", descricao: "Sexta-feira Santa" },
-  { data: "21/04/2026", descricao: "Tiradentes" },
-  { data: "01/05/2026", descricao: "Dia do Trabalho" },
-  { data: "04/06/2026", descricao: "Corpus Christi" },
-  { data: "07/09/2026", descricao: "Independência do Brasil" },
-  { data: "12/10/2026", descricao: "Nossa Senhora Aparecida" },
-  { data: "02/11/2026", descricao: "Finados" },
-  { data: "15/11/2026", descricao: "Proclamação da República" },
-  { data: "25/12/2026", descricao: "Natal" },
+const FERIADOS_2026 = [
+  { data: "2026-01-01", descricao: "Confraternização Universal" },
+  { data: "2026-02-17", descricao: "Carnaval" },
+  { data: "2026-02-18", descricao: "Quarta-feira de Cinzas" },
+  { data: "2026-04-03", descricao: "Sexta-feira Santa" },
+  { data: "2026-04-21", descricao: "Tiradentes" },
+  { data: "2026-05-01", descricao: "Dia do Trabalho" },
+  { data: "2026-06-04", descricao: "Corpus Christi" },
+  { data: "2026-09-07", descricao: "Independência do Brasil" },
+  { data: "2026-10-12", descricao: "Nossa Senhora Aparecida" },
+  { data: "2026-11-02", descricao: "Finados" },
+  { data: "2026-11-15", descricao: "Proclamação da República" },
+  { data: "2026-12-25", descricao: "Natal" },
 ];
 
-// Dados mockados iniciais
-const feriadosIniciais: Feriado[] = [
-  { id: "1", data: "01/01/2026", descricao: "Confraternização Universal" },
-  { id: "2", data: "03/04/2026", descricao: "Sexta-feira Santa" },
-];
+/** Formata data ISO para DD/MM/YYYY */
+function formatarData(iso: string): string {
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
 
-const consultoresIniciais: Consultor[] = [
-  { id: "1", nome: "João Test Silva", email: "joao.test@example.com", codigoPowerCRM: "TEST123", idCooperativa: "1", ativo: true },
-  { id: "2", nome: "Maria Test Santos", email: "maria.test@example.com", codigoPowerCRM: "TEST456", idCooperativa: "1", ativo: true },
-];
+// --- Skeleton para tabelas ---
+function TabelaSkeleton({ colunas }: { colunas: number }) {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, i) => (
+        <TableRow key={i}>
+          {Array.from({ length: colunas }).map((_, j) => (
+            <TableCell key={j}>
+              <Skeleton className="h-4 w-full" />
+            </TableCell>
+          ))}
+        </TableRow>
+      ))}
+    </>
+  );
+}
 
 export default function AdministracaoPage() {
-  const [feriados, setFeriados] = useState<Feriado[]>(feriadosIniciais);
-  const [consultores, setConsultores] = useState<Consultor[]>(consultoresIniciais);
+  const [feriados, setFeriados] = useState<Feriado[]>([]);
+  const [consultores, setConsultores] = useState<Consultor[]>([]);
+  const [carregandoFeriados, setCarregandoFeriados] = useState(true);
+  const [carregandoConsultores, setCarregandoConsultores] = useState(true);
   const [salvandoFeriado, setSalvandoFeriado] = useState(false);
   const [salvandoConsultor, setSalvandoConsultor] = useState(false);
+  const [importando, setImportando] = useState(false);
 
-  // Formulário de feriados
   const feriadoForm = useForm<FeriadoFormData>({
     resolver: zodResolver(feriadoSchema),
     defaultValues: { data: "", descricao: "" },
   });
 
-  // Formulário de consultores
   const consultorForm = useForm<ConsultorFormData>({
     resolver: zodResolver(consultorSchema),
     defaultValues: { nome: "", email: "", codigoPowerCRM: "", idCooperativa: "" },
   });
 
-  // Adiciona um feriado manualmente
-  function adicionarFeriado(data: FeriadoFormData) {
+  // --- Feriados: busca do banco ---
+  const buscarFeriados = useCallback(async () => {
+    setCarregandoFeriados(true);
+    try {
+      const res = await fetch("/api/feriados");
+      if (!res.ok) throw new Error("Falha ao buscar feriados");
+      const data = await res.json();
+      setFeriados(data);
+    } catch {
+      toast.error("Não foi possível carregar os feriados.");
+    } finally {
+      setCarregandoFeriados(false);
+    }
+  }, []);
+
+  // --- Consultores: busca do banco ---
+  const buscarConsultores = useCallback(async () => {
+    setCarregandoConsultores(true);
+    try {
+      const res = await fetch("/api/consultores");
+      if (!res.ok) throw new Error("Falha ao buscar consultores");
+      const data = await res.json();
+      setConsultores(data);
+    } catch {
+      toast.error("Não foi possível carregar os consultores.");
+    } finally {
+      setCarregandoConsultores(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    buscarFeriados();
+    buscarConsultores();
+  }, [buscarFeriados, buscarConsultores]);
+
+  // --- Feriados: cadastro ---
+  async function adicionarFeriado(data: FeriadoFormData) {
     setSalvandoFeriado(true);
-    // Formata a data de YYYY-MM-DD para DD/MM/YYYY
-    const [ano, mes, dia] = data.data.split("-");
-    const dataFormatada = `${dia}/${mes}/${ano}`;
-
-    const novoFeriado: Feriado = {
-      id: Date.now().toString(),
-      data: dataFormatada,
-      descricao: data.descricao,
-    };
-
-    setFeriados((prev) => [...prev, novoFeriado].sort((a, b) => {
-      // Ordena por data (DD/MM/YYYY)
-      const [dA, mA, yA] = a.data.split("/");
-      const [dB, mB, yB] = b.data.split("/");
-      return new Date(`${yA}-${mA}-${dA}`).getTime() - new Date(`${yB}-${mB}-${dB}`).getTime();
-    }));
-
-    feriadoForm.reset();
-    toast.success("Feriado cadastrado com sucesso!");
-    setSalvandoFeriado(false);
-  }
-
-  // Remove um feriado pelo ID
-  function removerFeriado(id: string) {
-    setFeriados((prev) => prev.filter((f) => f.id !== id));
-    toast.success("Feriado removido.");
-  }
-
-  // Importa feriados pré-definidos de um ano
-  function importarFeriados(ano: 2025 | 2026) {
-    const lista = ano === 2025 ? feriadosBrasil2025 : feriadosBrasil2026;
-    const novos = lista.map((f, i) => ({ ...f, id: `import-${ano}-${i}` }));
-    setFeriados((prev) => {
-      // Remove feriados do mesmo ano antes de importar
-      const filtrado = prev.filter((f) => !f.data.endsWith(`/${ano}`));
-      return [...filtrado, ...novos].sort((a, b) => {
-        const [dA, mA, yA] = a.data.split("/");
-        const [dB, mB, yB] = b.data.split("/");
-        return new Date(`${yA}-${mA}-${dA}`).getTime() - new Date(`${yB}-${mB}-${dB}`).getTime();
+    try {
+      const res = await fetch("/api/feriados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
       });
-    });
-    toast.success(`${novos.length} feriados de ${ano} importados!`);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.erro ?? "Erro ao cadastrar feriado");
+      toast.success("Feriado cadastrado com sucesso!");
+      feriadoForm.reset();
+      buscarFeriados();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setSalvandoFeriado(false);
+    }
   }
 
-  // Adiciona um consultor
-  function adicionarConsultor(data: ConsultorFormData) {
+  // --- Feriados: remoção ---
+  async function removerFeriado(id: string) {
+    try {
+      const res = await fetch(`/api/feriados/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao remover feriado");
+      toast.success("Feriado removido.");
+      setFeriados((prev) => prev.filter((f) => f.id !== id));
+    } catch {
+      toast.error("Não foi possível remover o feriado.");
+    }
+  }
+
+  // --- Feriados: importação em lote ---
+  async function importarFeriados(ano: 2025 | 2026) {
+    setImportando(true);
+    try {
+      const lista = ano === 2025 ? FERIADOS_2025 : FERIADOS_2026;
+      const res = await fetch("/api/feriados", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ feriados: lista }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.erro ?? "Erro ao importar feriados");
+      toast.success(`${json.importados} feriados de ${ano} importados!`);
+      buscarFeriados();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setImportando(false);
+    }
+  }
+
+  // --- Consultores: cadastro ---
+  async function adicionarConsultor(data: ConsultorFormData) {
     setSalvandoConsultor(true);
-    const novoConsultor: Consultor = {
-      id: Date.now().toString(),
-      ...data,
-      ativo: true,
-    };
-    setConsultores((prev) => [...prev, novoConsultor]);
-    consultorForm.reset();
-    toast.success("Consultor cadastrado com sucesso!");
-    setSalvandoConsultor(false);
+    try {
+      const res = await fetch("/api/consultores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.erro ?? "Erro ao cadastrar consultor");
+      toast.success("Consultor cadastrado com sucesso!");
+      consultorForm.reset();
+      buscarConsultores();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro inesperado.");
+    } finally {
+      setSalvandoConsultor(false);
+    }
   }
 
-  // Remove um consultor pelo ID
-  function removerConsultor(id: string) {
-    setConsultores((prev) => prev.filter((c) => c.id !== id));
-    toast.success("Consultor removido.");
+  // --- Consultores: remoção ---
+  async function removerConsultor(id: string) {
+    try {
+      const res = await fetch(`/api/consultores/${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Erro ao remover consultor");
+      toast.success("Consultor removido.");
+      setConsultores((prev) => prev.filter((c) => c.id !== id));
+    } catch {
+      toast.error("Não foi possível remover o consultor.");
+    }
   }
 
-  // Alterna o status ativo/inativo de um consultor
-  function alternarStatusConsultor(id: string) {
+  // --- Consultores: alternar status ativo/inativo ---
+  async function alternarStatusConsultor(id: string, ativo: boolean) {
+    // Atualização otimista — reflete na UI imediatamente
     setConsultores((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ativo: !c.ativo } : c))
+      prev.map((c) => (c.id === id ? { ...c, ativo: !ativo } : c))
     );
+    try {
+      const res = await fetch(`/api/consultores/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ativo: !ativo }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar status");
+    } catch {
+      // Reverte em caso de erro
+      setConsultores((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ativo } : c))
+      );
+      toast.error("Não foi possível atualizar o status do consultor.");
+    }
   }
 
   return (
@@ -226,7 +317,7 @@ export default function AdministracaoPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Aba de Feriados */}
+        {/* ─── Aba de Feriados ─── */}
         <TabsContent value="feriados" className="mt-4 space-y-4">
           {/* Formulário de adicionar feriado */}
           <Card>
@@ -242,11 +333,7 @@ export default function AdministracaoPage() {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="feriado-data">Data</Label>
-                    <Input
-                      id="feriado-data"
-                      type="date"
-                      {...feriadoForm.register("data")}
-                    />
+                    <Input id="feriado-data" type="date" {...feriadoForm.register("data")} />
                     {feriadoForm.formState.errors.data && (
                       <p className="text-xs text-red-500">{feriadoForm.formState.errors.data.message}</p>
                     )}
@@ -264,7 +351,11 @@ export default function AdministracaoPage() {
                   </div>
                 </div>
                 <Button type="submit" disabled={salvandoFeriado} className="gap-2">
-                  {salvandoFeriado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {salvandoFeriado ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Plus className="h-4 w-4" />
+                  )}
                   Cadastrar Feriado
                 </Button>
               </form>
@@ -278,30 +369,46 @@ export default function AdministracaoPage() {
               <p className="text-xs text-muted-foreground">Importe feriados nacionais pré-definidos</p>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-3">
-              <Button variant="outline" className="gap-2" onClick={() => importarFeriados(2025)}>
-                <CalendarDays className="h-4 w-4" />
+              <Button
+                variant="outline"
+                className="gap-2"
+                disabled={importando}
+                onClick={() => importarFeriados(2025)}
+              >
+                {importando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarDays className="h-4 w-4" />}
                 Importar Feriados 2025
               </Button>
-              <Button variant="outline" className="gap-2" onClick={() => importarFeriados(2026)}>
-                <CalendarDays className="h-4 w-4" />
+              <Button
+                variant="outline"
+                className="gap-2"
+                disabled={importando}
+                onClick={() => importarFeriados(2026)}
+              >
+                {importando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CalendarDays className="h-4 w-4" />}
                 Importar Feriados 2026
               </Button>
             </CardContent>
           </Card>
 
-          {/* Lista de feriados cadastrados */}
+          {/* Tabela de feriados cadastrados */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Feriados Cadastrados</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {feriados.length} feriado(s) cadastrado(s)
-              </p>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Feriados Cadastrados</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {carregandoFeriados ? "Carregando..." : `${feriados.length} feriado(s) cadastrado(s)`}
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={buscarFeriados} disabled={carregandoFeriados}>
+                <RefreshCw className={`h-4 w-4 ${carregandoFeriados ? "animate-spin" : ""}`} />
+              </Button>
             </CardHeader>
-            <CardContent className="p-0">
-              {feriados.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
-                  <CalendarDays className="h-8 w-8 opacity-40" />
-                  <p className="text-sm">Nenhum feriado cadastrado</p>
+            <CardContent>
+              {!carregandoFeriados && feriados.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 opacity-40" />
+                  <p className="text-sm">Nenhum feriado cadastrado.</p>
+                  <p className="text-xs">Use o formulário acima ou importe os feriados nacionais.</p>
                 </div>
               ) : (
                 <Table>
@@ -313,22 +420,26 @@ export default function AdministracaoPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {feriados.map((feriado) => (
-                      <TableRow key={feriado.id}>
-                        <TableCell className="font-medium">{feriado.data}</TableCell>
-                        <TableCell>{feriado.descricao}</TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                            onClick={() => removerFeriado(feriado.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {carregandoFeriados ? (
+                      <TabelaSkeleton colunas={3} />
+                    ) : (
+                      feriados.map((f) => (
+                        <TableRow key={f.id}>
+                          <TableCell className="font-mono text-sm">{formatarData(f.data)}</TableCell>
+                          <TableCell>{f.descricao}</TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => removerFeriado(f.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               )}
@@ -336,9 +447,9 @@ export default function AdministracaoPage() {
           </Card>
         </TabsContent>
 
-        {/* Aba de Consultores */}
+        {/* ─── Aba de Consultores ─── */}
         <TabsContent value="consultores" className="mt-4 space-y-4">
-          {/* Formulário de adicionar consultor */}
+          {/* Formulário de cadastro de consultor */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
@@ -376,9 +487,9 @@ export default function AdministracaoPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="consultor-crm">Código PowerCRM</Label>
+                    <Label htmlFor="consultor-codigo">Código PowerCRM</Label>
                     <Input
-                      id="consultor-crm"
+                      id="consultor-codigo"
                       placeholder="Ex: 12345"
                       {...consultorForm.register("codigoPowerCRM")}
                     />
@@ -387,9 +498,9 @@ export default function AdministracaoPage() {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="consultor-coop">ID Cooperativa</Label>
+                    <Label htmlFor="consultor-cooperativa">ID Cooperativa</Label>
                     <Input
-                      id="consultor-coop"
+                      id="consultor-cooperativa"
                       placeholder="Ex: 1317"
                       {...consultorForm.register("idCooperativa")}
                     />
@@ -399,26 +510,38 @@ export default function AdministracaoPage() {
                   </div>
                 </div>
                 <Button type="submit" disabled={salvandoConsultor} className="gap-2">
-                  {salvandoConsultor ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                  {salvandoConsultor ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <UserPlus className="h-4 w-4" />
+                  )}
                   Cadastrar Consultor
                 </Button>
               </form>
             </CardContent>
           </Card>
 
-          {/* Lista de consultores */}
+          {/* Tabela de consultores */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Consultores Cadastrados</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                {consultores.filter((c) => c.ativo).length} consultor(es) disponível(is) para atribuição automática
-              </p>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Consultores Cadastrados</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {carregandoConsultores
+                    ? "Carregando..."
+                    : `${consultores.filter((c) => c.ativo).length} consultor(es) disponível(is) para atribuição automática`}
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={buscarConsultores} disabled={carregandoConsultores}>
+                <RefreshCw className={`h-4 w-4 ${carregandoConsultores ? "animate-spin" : ""}`} />
+              </Button>
             </CardHeader>
-            <CardContent className="p-0">
-              {consultores.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
-                  <Users className="h-8 w-8 opacity-40" />
-                  <p className="text-sm">Nenhum consultor cadastrado</p>
+            <CardContent>
+              {!carregandoConsultores && consultores.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+                  <AlertCircle className="h-8 w-8 opacity-40" />
+                  <p className="text-sm">Nenhum consultor cadastrado.</p>
+                  <p className="text-xs">Use o formulário acima para adicionar consultores do PowerCRM.</p>
                 </div>
               ) : (
                 <Table>
@@ -433,47 +556,43 @@ export default function AdministracaoPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {consultores.map((consultor) => (
-                      <TableRow key={consultor.id}>
-                        <TableCell className="font-medium">{consultor.nome}</TableCell>
-                        <TableCell className="text-muted-foreground">{consultor.email}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{consultor.codigoPowerCRM}</Badge>
-                        </TableCell>
-                        <TableCell>{consultor.idCooperativa}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Switch
-                              checked={consultor.ativo}
-                              onCheckedChange={() => alternarStatusConsultor(consultor.id)}
-                            />
-                            <span className={`text-xs font-medium ${consultor.ativo ? "text-emerald-600" : "text-muted-foreground"}`}>
-                              {consultor.ativo ? "Ativo" : "Inativo"}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                    {carregandoConsultores ? (
+                      <TabelaSkeleton colunas={6} />
+                    ) : (
+                      consultores.map((c) => (
+                        <TableRow key={c.id}>
+                          <TableCell className="font-medium">{c.nome}</TableCell>
+                          <TableCell className="text-muted-foreground">{c.email}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="font-mono text-xs">
+                              {c.codigoPowerCRM}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">{c.idCooperativa}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <Switch
+                                checked={c.ativo}
+                                onCheckedChange={() => alternarStatusConsultor(c.id, c.ativo)}
+                              />
+                              <span className={`text-xs font-medium ${c.ativo ? "text-emerald-600" : "text-muted-foreground"}`}>
+                                {c.ativo ? "Ativo" : "Inativo"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={() => toast.info("Edição em breve.")}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                              onClick={() => removerConsultor(consultor.id)}
+                              className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                              onClick={() => removerConsultor(c.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
               )}
