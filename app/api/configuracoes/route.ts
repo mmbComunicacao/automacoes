@@ -17,8 +17,12 @@ const CHAVES_VALIDAS = [
   "notificar_execucao_manual",
   "intervalo_inativos",
   "executar_apenas_uteis_inativos",
+  "hora_inicio_inativos",
+  "hora_fim_inativos",
   "intervalo_inadimplentes",
   "executar_apenas_uteis_inadimplentes",
+  "hora_inicio_inadimplentes",
+  "hora_fim_inadimplentes",
 ] as const;
 
 // Schema para salvar configurações em lote

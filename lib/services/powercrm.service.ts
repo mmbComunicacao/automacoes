@@ -342,7 +342,7 @@ async function addActivityInativo(quotationCode: string): Promise<void> {
   const payload: AddActivityPayload = {
     type: 2,
     description:
-      "Associado identificado como INATIVO pelo sistema de monitoramento automático. Verificar possibilidade de reativação.",
+      "Associado identificado como INATIVO pelo sistema de monitoramento automático. Dar tratativa na retenção ou negociação em outra seguradora.",
     quotationCode,
     scheduled: scheduledAt(30), // Agendado para 30 minutos após criação
   };
@@ -390,6 +390,7 @@ export async function criarLeadCRM(
 export async function criarLeadInativoCRM(
   associado: AssociadoInativoData
 ): Promise<AddLeadResponse> {
+  // Códigos retornados serão: quotationCode e negotiationCode
   const codes = await addLeadInativo(associado);
 
   // Aguarda antes de criar a atividade para garantir que o lead foi processado
