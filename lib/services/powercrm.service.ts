@@ -56,6 +56,12 @@ export interface AssociadoInativoData {
   codigo_cooperativa: string;
 }
 
+
+interface AddTagPayload {
+  quotationCode: string;
+  tagId: number;
+}
+
 // --- Helpers ---
 
 /** Aguarda N milissegundos */
@@ -68,6 +74,8 @@ function scheduledAt(minutesFromNow: number): string {
   // Ajusta para GMT-3 (Brasil)
   const offset = -3 * 60;
   const local = new Date(date.getTime() + offset * 60 * 1000);
+
+  console.log(local.toISOString().replace("T", " ").slice(0, 19))
 
   return local.toISOString().replace("T", " ").slice(0, 19);
 }
@@ -91,14 +99,14 @@ function getBaseUrl(): string {
 // --- Funções da API ---
 
 /** Adiciona o lead no CRM e retorna quotationCode e negotiationCode */
-async function addLead(dados: ContratacaoFormData): Promise<AddLeadResponse> {
+async function addLead(associado: ContratacaoFormData): Promise<AddLeadResponse> {
   const origemId = parseInt(process.env.POWERCRM_ORIGEM_ID ?? "0", 10);
-  const regiao = getRegionByDDD({ phoneNumber: dados.telefone });
+  const regiao = getRegionByDDD({ phoneNumber: associado.telefone });
 
   const payload: AddLeadPayload = {
-    name: dados.nome,
-    email: dados.email,
-    phone: dados.telefone.replace(/\D/g, ""),
+    name: associado.nome,
+    email: associado.email,
+    phone: associado.telefone.replace(/\D/g, ""),
     origemId,
     coop: regiao.coop,
   };
@@ -120,6 +128,19 @@ async function addLead(dados: ContratacaoFormData): Promise<AddLeadResponse> {
     throw new Error(
       "[PowerCRM] addLead: resposta sem quotationCode ou negotiationCode."
     );
+  }
+
+  const { quotationCode } = data;
+
+  // Lógica de Tags com Retry (Background)
+  const tagIdInativo = 21452;
+  const { tag: tagRegional } = getRegionByDDD({ phoneNumber: associado.telefone });
+  const tagsParaAdicionar = [tagIdInativo, tagRegional];
+
+  for (const id of tagsParaAdicionar) {
+    if (!id) continue;
+    // Dispara cada tag com retry, mas sem mudar a coop (geralmente tag não exige isso)
+    executeGenericRetry(`Tag ${id}`, quotationCode, () => tryAddTag(quotationCode, id), false).catch(console.error);
   }
 
   return {
@@ -149,14 +170,17 @@ async function updateLeadCoop(quotationCode: string): Promise<void> {
   }
 }
 
-/** Tenta adicionar a atividade uma única vez — retorna true se bem-sucedido */
-async function tryAddActivity(quotationCode: string): Promise<boolean> {
+/** Tenta adicionar a atividade uma única vez */
+async function tryAddActivity(
+  quotationCode: string, 
+  description: string, 
+  scheduledMinutes: number = 20
+): Promise<boolean> {
   const payload: AddActivityPayload = {
     type: 2,
-    description:
-      "Lead originado pelo Clube Mais Seguro. Termo de adesão encaminhado para assinatura via ClickSign.",
+    description,
     quotationCode,
-    scheduled: scheduledAt(20), // 20 minutos após a criação do lead
+    scheduled: scheduledAt(scheduledMinutes),
   };
 
   try {
@@ -173,54 +197,42 @@ async function tryAddActivity(quotationCode: string): Promise<boolean> {
 }
 
 /**
- * Tenta adicionar a atividade com retry automático.
- *
- * Estratégia:
- * - Bloco 1: 3 tentativas — aguarda 10s antes da 1ª, 5s antes da 2ª, 5s antes da 3ª
- * - Se falhar: atualiza coop para Goiânia e faz mais 3 tentativas (5s entre cada)
- * - Se ainda falhar: registra aviso e segue sem bloquear o fluxo
+ * Lógica robusta de Retry Genérica
+ * @param label Nome para o log (Atividade, Tag, etc)
+ * @param quotationCode Código do lead
+ * @param tryFn Função que executa a tentativa e retorna boolean
+ * @param useFallbackCoop Se deve tentar mudar para Goiânia em caso de falha total
  */
-async function addActivityWithRetry(quotationCode: string): Promise<void> {
-  const delaysBloco1 = [10_000, 5_000, 5_000];
+async function executeGenericRetry(
+  label: string,
+  quotationCode: string,
+  tryFn: () => Promise<boolean>,
+  useFallbackCoop: boolean = true
+): Promise<void> {
+  const delays = [30_000, 10_000, 10_000]; // 30s iniciais + retentativas
 
-  // --- Bloco 1: tentativas com coop original ---
-  for (let i = 0; i < 3; i++) {
-    await sleep(delaysBloco1[i]);
-
-    const ok = await tryAddActivity(quotationCode);
-    if (ok) {
-      console.log(`[PowerCRM] Atividade adicionada na tentativa ${i + 1} (bloco 1).`);
+  // Bloco 1: Tentativas iniciais
+  for (let i = 0; i < delays.length; i++) {
+    await sleep(delays[i]);
+    if (await tryFn()) {
+      console.log(`[PowerCRM] ${label} adicionada com sucesso.`);
       return;
     }
-
-    console.warn(`[PowerCRM] Tentativa ${i + 1}/3 (bloco 1) falhou.`);
+    console.warn(`[PowerCRM] Tentativa ${i + 1}/3 de ${label} falhou.`);
   }
 
-  // --- Fallback: atualiza coop para Goiânia ---
-  console.warn(
-    "[PowerCRM] Bloco 1 esgotado. Atualizando coop para Goiânia e retentando..."
-  );
-  await updateLeadCoop(quotationCode);
-
-  // --- Bloco 2: 3 novas tentativas após atualizar a coop ---
-  for (let i = 0; i < 3; i++) {
-    if (i > 0) await sleep(5_000);
-
-    const ok = await tryAddActivity(quotationCode);
-    if (ok) {
-      console.log(
-        `[PowerCRM] Atividade adicionada na tentativa ${i + 1} (bloco 2 / fallback Goiânia).`
-      );
-      return;
+  // Bloco 2: Fallback para Goiânia
+  if (useFallbackCoop) {
+    console.warn(`[PowerCRM] Bloco 1 esgotado para ${label}. Migrando para Goiânia...`);
+    await updateLeadCoop(quotationCode);
+    
+    for (let i = 0; i < 2; i++) {
+      await sleep(10_000);
+      if (await tryFn()) return;
     }
-
-    console.warn(`[PowerCRM] Tentativa ${i + 1}/3 (bloco 2) falhou.`);
   }
 
-  // Não bloqueia o fluxo — contrato e ClickSign já foram processados
-  console.warn(
-    "[PowerCRM] Não foi possível adicionar a atividade após 6 tentativas. Seguindo sem ela."
-  );
+  console.error(`[PowerCRM] Falha definitiva em ${label} para o lead ${quotationCode}`);
 }
 
 /**
@@ -304,14 +316,14 @@ async function addLeadInativo(associado: AssociadoInativoData): Promise<AddLeadR
   );
 
   // Determina a coop pelo telefone do associado
-  const regiao = getRegionByDDD({ phoneNumber: associado.telefone_celular });
+  const { coop, tag } = getRegionByDDD({ phoneNumber: associado.telefone_celular });
 
   const payload: AddLeadPayload = {
     name: associado.nome,
     email: associado.email,
     phone: associado.telefone_celular.replace(/\D/g, ""),
     origemId,
-    coop: regiao.coop,
+    coop,
   };
 
   const res = await fetch(`${getBaseUrl()}/api/quotation/add`, {
@@ -331,54 +343,28 @@ async function addLeadInativo(associado: AssociadoInativoData): Promise<AddLeadR
     throw new Error("[PowerCRM] addLeadInativo: resposta sem quotationCode ou negotiationCode.");
   }
 
+  // Tenta adicionar tag de inativos
+  const tagIdInativo = 21452;
+  const tags = [tagIdInativo, tag]
+  
+  for (const tag of tags) { 
+    tryAddTag(data.quotationCode, tag).catch(console.error);
+  }
+
   return { quotationCode: data.quotationCode, negotiationCode: data.negotiationCode };
 }
-
-/**
- * Adiciona a atividade de inativo no CRM.
- * Informa que o lead é um associado que ficou inativo.
- */
-async function addActivityInativo(quotationCode: string): Promise<void> {
-  const payload: AddActivityPayload = {
-    type: 2,
-    description:
-      "Associado identificado como INATIVO pelo sistema de monitoramento automático. Dar tratativa na retenção ou negociação em outra seguradora.",
-    quotationCode,
-    scheduled: scheduledAt(30), // Agendado para 30 minutos após criação
-  };
-
-  try {
-    const res = await fetch(`${getBaseUrl()}/api/quotation/add-activity`, {
-      method: "POST",
-      headers: getHeaders(),
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      console.warn(`[PowerCRM] addActivityInativo falhou (${res.status}) para ${quotationCode}`);
-    } else {
-      console.log(`[PowerCRM] Atividade de inativo registrada para ${quotationCode}`);
-    }
-  } catch (err) {
-    console.warn(`[PowerCRM] Erro ao adicionar atividade de inativo:`, err);
-  }
-}
-
-// --- Funções principais exportadas ---
 
 /**
  * Cria o lead no CRM e dispara o fluxo de atividade em background.
  * Retorna quotationCode e negotiationCode para serem salvos no banco.
  */
-export async function criarLeadCRM(
-  dados: ContratacaoFormData
-): Promise<AddLeadResponse> {
+export async function criarLeadCRM(dados: ContratacaoFormData): Promise<AddLeadResponse> {
   const codes = await addLead(dados);
+  const msg = "Lead originado pelo Projeto Automações.";
 
-  // Dispara o retry de atividade em background — não bloqueia a resposta ao usuário
-  addActivityWithRetry(codes.quotationCode).catch((err) =>
-    console.error("[PowerCRM] Erro inesperado no addActivityWithRetry:", err)
-  );
+  executeGenericRetry("Atividade", codes.quotationCode, () => 
+    tryAddActivity(codes.quotationCode, msg)
+  ).catch(console.error);
 
   return codes;
 }
@@ -387,15 +373,38 @@ export async function criarLeadCRM(
  * Cria o lead de associado inativo no CRM e registra a atividade correspondente.
  * Aguarda 5s antes de tentar criar a atividade (CRM precisa processar o lead).
  */
-export async function criarLeadInativoCRM(
-  associado: AssociadoInativoData
-): Promise<AddLeadResponse> {
-  // Códigos retornados serão: quotationCode e negotiationCode
+export async function criarLeadInativoCRM(associado: AssociadoInativoData): Promise<AddLeadResponse> {
   const codes = await addLeadInativo(associado);
+  const msg = "Associado identificado como INATIVO. Dar tratativa na retenção.";
 
-  // Aguarda antes de criar a atividade para garantir que o lead foi processado
-  await sleep(5_000);
-  await addActivityInativo(codes.quotationCode);
+  executeGenericRetry("Atividade Inativo", codes.quotationCode, () => 
+    tryAddActivity(codes.quotationCode, msg, 30)
+  ).catch(console.error);
 
   return codes;
+}
+
+/** Tenta adicionar a atividade uma única vez */
+async function tryAddTag(
+  quotationCode: string,
+  tagId: number,
+): Promise<boolean> {
+
+  const payload: AddTagPayload = {
+    quotationCode,
+    tagId,
+  };
+
+  try {
+    // Promise para adicionar tag por tag, uma por uma
+    const res = await fetch(`${getBaseUrl()}/api/quotation/add-tag`, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify(payload),
+    });
+
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
