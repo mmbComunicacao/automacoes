@@ -34,13 +34,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SidebarProvider>
-            <SideBar />
-            <SidebarInset>
-              <Header />
-              <main className="flex-1">{children}</main>
-            </SidebarInset>
-          </SidebarProvider>
+          {children}
           {/* Toast global — disponível em todas as páginas */}
           <Toaster richColors position="top-right" />
         </ThemeProvider>

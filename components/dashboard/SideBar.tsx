@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   UserX,
@@ -29,12 +30,15 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
 
 const navItems = [
   { title: "Dashboard",     url: "/dashboard",    icon: LayoutDashboard },
@@ -50,7 +54,30 @@ const adminItems = [
 
 export function SideBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { setTheme, theme } = useTheme();
+  const [user, setUser] = useState<User | null>(null);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+    };
+    getUser();
+  }, [supabase]);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
+  const userEmail = user?.email || "usuario@alphanacional.com.br";
+  const userInitials = user?.email 
+    ? user.email.substring(0, 2).toUpperCase() 
+    : "??";
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || "Usuário";
 
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -144,13 +171,13 @@ export function SideBar() {
               >
                 <Avatar className="h-8 w-8 rounded-lg border border-sidebar-border shrink-0">
                   <AvatarFallback className="rounded-lg bg-blue-600 text-white text-xs font-semibold">
-                    KR
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold text-xs">Kaique Roque</span>
+                  <span className="truncate font-semibold text-xs capitalize">{userName}</span>
                   <span className="truncate text-xs text-muted-foreground">
-                    kaique.roque@alphanacional.com.br
+                    {userEmail}
                   </span>
                 </div>
               </DropdownMenuTrigger>
@@ -160,21 +187,23 @@ export function SideBar() {
                 align="start"
                 sideOffset={8}
               >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-2 py-2 text-left">
-                    <Avatar className="h-8 w-8 rounded-lg border">
-                      <AvatarFallback className="rounded-lg bg-blue-600 text-white text-xs font-semibold">
-                        KR
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">Kaique Roque</span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        kaique.roque@alphanacional.com.br
-                      </span>
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="p-0 font-normal">
+                    <div className="flex items-center gap-2 px-2 py-2 text-left">
+                      <Avatar className="h-8 w-8 rounded-lg border">
+                        <AvatarFallback className="rounded-lg bg-blue-600 text-white text-xs font-semibold">
+                          {userInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="grid flex-1 text-left text-sm leading-tight">
+                        <span className="truncate font-semibold capitalize">{userName}</span>
+                        <span className="truncate text-xs text-muted-foreground">
+                          {userEmail}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </DropdownMenuLabel>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer gap-2"
@@ -190,7 +219,7 @@ export function SideBar() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer gap-2 text-red-600 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20"
-                  onClick={() => console.log("Deslogar")}
+                  onClick={handleSignOut}
                 >
                   <LogOut className="size-4" />
                   Sair
