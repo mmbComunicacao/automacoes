@@ -91,7 +91,7 @@ export default function LoginPage() {
         </div>
         
         {/* Elemento Decorativo - Gradient */}
-        <div className="absolute bottom-0 left-0 right-0 h-64 bg-gradient-to-t from-primary/20 to-transparent pointer-events-none" />
+        <div className="absolute bottom-0 left-0 right-0 h-64 bg-linear-to-t from-primary/20 to-transparent pointer-events-none" />
       </div>
 
       {/* Lado Direito - Formulário */}
