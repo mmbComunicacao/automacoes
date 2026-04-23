@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/inativos",
+      "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/cron/inadimplentes",
+      "schedule": "*/30 * * * *"
+    }
+  ]
+}

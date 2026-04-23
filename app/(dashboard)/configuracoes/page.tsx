@@ -30,8 +30,12 @@ interface Configuracoes {
   notificar_execucao_manual: boolean;
   intervalo_inativos: string;
   executar_apenas_uteis_inativos: boolean;
+  hora_inicio_inativos: string;
+  hora_fim_inativos: string;
   intervalo_inadimplentes: string;
   executar_apenas_uteis_inadimplentes: boolean;
+  hora_inicio_inadimplentes: string;
+  hora_fim_inadimplentes: string;
 }
 
 // Valores padrão — usados quando o banco ainda não tem configurações salvas
@@ -39,10 +43,14 @@ const DEFAULTS: Configuracoes = {
   notificar_sucesso: true,
   notificar_falha: true,
   notificar_execucao_manual: false,
-  intervalo_inativos: "30",
+  intervalo_inativos: "60",
   executar_apenas_uteis_inativos: true,
-  intervalo_inadimplentes: "1440",
+  hora_inicio_inativos: "08:00",
+  hora_fim_inativos: "17:00",
+  intervalo_inadimplentes: "60",
   executar_apenas_uteis_inadimplentes: true,
+  hora_inicio_inadimplentes: "08:00",
+  hora_fim_inadimplentes: "17:00",
 };
 
 export default function ConfiguracoesPage() {
@@ -286,7 +294,27 @@ export default function ConfiguracoesPage() {
                     />
                     <p className="text-xs text-muted-foreground">Mínimo: 5 minutos</p>
                   </div>
-                  <div className="flex items-center gap-3 pt-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inicio-inativos">Hora Início</Label>
+                      <Input
+                        id="inicio-inativos"
+                        type="time"
+                        value={config.hora_inicio_inativos}
+                        onChange={(e) => atualizar("hora_inicio_inativos", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fim-inativos">Hora Fim</Label>
+                      <Input
+                        id="fim-inativos"
+                        type="time"
+                        value={config.hora_fim_inativos}
+                        onChange={(e) => atualizar("hora_fim_inativos", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
                     <Switch
                       id="uteis-inativos"
                       checked={config.executar_apenas_uteis_inativos}
@@ -318,14 +346,34 @@ export default function ConfiguracoesPage() {
                     <Input
                       id="intervalo-inadimplentes"
                       type="number"
-                      min="60"
+                      min="1"
                       max="10080"
                       value={config.intervalo_inadimplentes}
                       onChange={(e) => atualizar("intervalo_inadimplentes", e.target.value)}
                     />
-                    <p className="text-xs text-muted-foreground">1440 = 1 vez por dia</p>
+                    <p className="text-xs text-muted-foreground">Padrão: 60 minutos</p>
                   </div>
-                  <div className="flex items-center gap-3 pt-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="inicio-inadimplentes">Hora Início</Label>
+                      <Input
+                        id="inicio-inadimplentes"
+                        type="time"
+                        value={config.hora_inicio_inadimplentes}
+                        onChange={(e) => atualizar("hora_inicio_inadimplentes", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fim-inadimplentes">Hora Fim</Label>
+                      <Input
+                        id="fim-inadimplentes"
+                        type="time"
+                        value={config.hora_fim_inadimplentes}
+                        onChange={(e) => atualizar("hora_fim_inadimplentes", e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 pt-2">
                     <Switch
                       id="uteis-inadimplentes"
                       checked={config.executar_apenas_uteis_inadimplentes}
