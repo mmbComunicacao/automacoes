@@ -13,9 +13,9 @@ export async function GET() {
   try {
     // Contagens globais por nível de log
     const [totalSucesso, totalFalhas, totalInfo] = await Promise.all([
-      prisma.log.count({ where: { nivel: NivelLog.SUCESSO } }),
-      prisma.log.count({ where: { nivel: NivelLog.ERRO } }),
-      prisma.log.count({ where: { nivel: NivelLog.INFO } }),
+      prisma.automacoesLog.count({ where: { nivel: NivelLog.SUCESSO } }),
+      prisma.automacoesLog.count({ where: { nivel: NivelLog.ERRO } }),
+      prisma.automacoesLog.count({ where: { nivel: NivelLog.INFO } }),
     ]);
 
     const total = totalSucesso + totalFalhas;
@@ -24,16 +24,16 @@ export async function GET() {
     // Métricas por automação
     const [totalInativos, sucessoInativos, falhasInativos, ultimoLogInativos] =
       await Promise.all([
-        prisma.log.count({
+        prisma.automacoesLog.count({
           where: { automacao: AutomacaoTipo.INATIVOS, nivel: { in: [NivelLog.SUCESSO, NivelLog.ERRO] } },
         }),
-        prisma.log.count({
+        prisma.automacoesLog.count({
           where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.SUCESSO },
         }),
-        prisma.log.count({
+        prisma.automacoesLog.count({
           where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.ERRO },
         }),
-        prisma.log.findFirst({
+        prisma.automacoesLog.findFirst({
           where: { automacao: AutomacaoTipo.INATIVOS },
           orderBy: { criadoEm: "desc" },
           select: { criadoEm: true },
@@ -42,16 +42,16 @@ export async function GET() {
 
     const [totalInadimplentes, sucessoInadimplentes, falhasInadimplentes, ultimoLogInadimplentes] =
       await Promise.all([
-        prisma.log.count({
+        prisma.automacoesLog.count({
           where: { automacao: AutomacaoTipo.INADIMPLENTES, nivel: { in: [NivelLog.SUCESSO, NivelLog.ERRO] } },
         }),
-        prisma.log.count({
+        prisma.automacoesLog.count({
           where: { automacao: AutomacaoTipo.INADIMPLENTES, nivel: NivelLog.SUCESSO },
         }),
-        prisma.log.count({
+        prisma.automacoesLog.count({
           where: { automacao: AutomacaoTipo.INADIMPLENTES, nivel: NivelLog.ERRO },
         }),
-        prisma.log.findFirst({
+        prisma.automacoesLog.findFirst({
           where: { automacao: AutomacaoTipo.INADIMPLENTES },
           orderBy: { criadoEm: "desc" },
           select: { criadoEm: true },
@@ -63,7 +63,7 @@ export async function GET() {
     seteDiasAtras.setDate(seteDiasAtras.getDate() - 6);
     seteDiasAtras.setHours(0, 0, 0, 0);
 
-    const logsPorDia = await prisma.log.groupBy({
+    const logsPorDia = await prisma.automacoesLog.groupBy({
       by: ["criadoEm", "nivel"],
       where: {
         criadoEm: { gte: seteDiasAtras },
@@ -78,7 +78,7 @@ export async function GET() {
     seisMesesAtras.setDate(1);
     seisMesesAtras.setHours(0, 0, 0, 0);
 
-    const logsPorMes = await prisma.log.findMany({
+    const logsPorMes = await prisma.automacoesLog.findMany({
       where: {
         criadoEm: { gte: seisMesesAtras },
         nivel: { in: [NivelLog.SUCESSO, NivelLog.ERRO] },

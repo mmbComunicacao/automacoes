@@ -4,13 +4,17 @@
  * No Prisma 7, a datasource é definida no prisma.config.ts.
  * Este arquivo contém apenas o generator e os models.
  *
+ * Convenção de nomenclatura:
+ * - Model TypeScript : AutomacoesXxx  (PascalCase com prefixo "Automacoes")
+ * - Tabela no banco  : automacoes_xxx (snake_case com prefixo "automacoes_")
+ *
  * Tabelas:
- * - Associado        : dados cadastrais do associado (CPF, nome, contato, cooperativa)
- * - AssociadoStatus  : histórico de situações — permite rastrear mudanças ao longo do tempo
- * - Log              : logs unificados de todas as automações do sistema
- * - Feriado          : feriados nacionais cadastrados (usados pelo scheduler para dias úteis)
- * - Consultor        : consultores do PowerCRM para matching com voluntários da Hinova
- * - Configuracao     : configurações do sistema (notificações, agendamento, etc.)
+ * - AutomacoesAssociado        → automacoes_associados
+ * - AutomacoesAssociadoStatus  → automacoes_associado_status
+ * - AutomacoesLog              → automacoes_logs
+ * - AutomacoesFeriado          → automacoes_feriados
+ * - AutomacoesConsultor        → automacoes_consultores
+ * - AutomacoesConfiguracao     → automacoes_configuracoes
  */
 
 generator client {
@@ -25,11 +29,11 @@ datasource db {
   provider = "postgresql"
 }
 
-// ─── Associado ──────────────────────────────────────────────────────────────────────────────
+// ─── AutomacoesAssociado ────────────────────────────────────────────────────────────────────
 // Dados cadastrais do associado vindos da Hinova.
 // O CPF é a chave de negócio — único e imutável.
 
-model Associado {
+model AutomacoesAssociado {
   id                String  @id @default(cuid())
   cpf               String  @unique
   nome              String
@@ -38,20 +42,20 @@ model Associado {
   codigoCooperativa String? @map("codigo_cooperativa")
 
   // Histórico de situações do associado
-  statusHistorico AssociadoStatus[]
+  statusHistorico AutomacoesAssociadoStatus[]
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  @@map("associados")
+  @@map("automacoes_associados")
 }
 
-// ─── AssociadoStatus ────────────────────────────────────────────────────────────────
+// ─── AutomacoesAssociadoStatus ──────────────────────────────────────────────────────────────
 // Histórico de situações do associado.
 // Cada registro representa um estado em um momento específico.
 // Isso permite rastrear quando o associado ficou inativo, inadimplente, etc.
 
-model AssociadoStatus {
+model AutomacoesAssociadoStatus {
   id          String @id @default(cuid())
   associadoId String @map("associado_id")
 
@@ -69,21 +73,21 @@ model AssociadoStatus {
 
   registradoEm DateTime @default(now()) @map("registrado_em")
 
-  // Relacionamento com Associado (cascade delete)
-  associado Associado @relation(fields: [associadoId], references: [id], onDelete: Cascade)
+  // Relacionamento com AutomacoesAssociado (cascade delete)
+  associado AutomacoesAssociado @relation(fields: [associadoId], references: [id], onDelete: Cascade)
 
   @@index([associadoId])
   @@index([situacao])
   @@index([situacaoFinanceira])
-  @@map("associado_status")
+  @@map("automacoes_associado_status")
 }
 
-// ─── Log ───────────────────────────────────────────────────────────────────────────────────
+// ─── AutomacoesLog ──────────────────────────────────────────────────────────────────────────
 // Tabela unificada de logs do sistema.
 // Todos os eventos de todas as automações são registrados aqui.
 // A separação na tela é feita filtrando por `automacao` e `integracao`.
 
-model Log {
+model AutomacoesLog {
   id String @id @default(cuid())
 
   // Qual automação gerou o log (ex: INATIVOS, INADIMPLENTES)
@@ -117,14 +121,14 @@ model Log {
   @@index([nivel])
   @@index([criadoEm])
   @@index([cpfAssociado])
-  @@map("logs")
+  @@map("automacoes_logs")
 }
 
-// ─── Feriado ───────────────────────────────────────────────────────────────────────────────
+// ─── AutomacoesFeriado ──────────────────────────────────────────────────────────────────────
 // Feriados nacionais cadastrados.
 // Usados pelo scheduler para determinar dias úteis e evitar execuções em feriados.
 
-model Feriado {
+model AutomacoesFeriado {
   id        String   @id @default(cuid())
   // Data no formato ISO (YYYY-MM-DD) — sem hora para evitar problemas de timezone
   data      DateTime @db.Date
@@ -134,42 +138,42 @@ model Feriado {
 
   @@unique([data]) // Não permite duplicar o mesmo feriado
   @@index([data])
-  @@map("feriados")
+  @@map("automacoes_feriados")
 }
 
-// ─── Consultor ─────────────────────────────────────────────────────────────────────────────
+// ─── AutomacoesConsultor ────────────────────────────────────────────────────────────────────
 // Consultores do PowerCRM cadastrados manualmente.
 // Usados para matching automático com voluntários da Hinova na criação de leads.
 
-model Consultor {
-  id              String  @id @default(cuid())
-  nome            String
-  email           String  @unique
-  codigoPowerCRM  String  @map("codigo_power_crm")
-  idCooperativa   String  @map("id_cooperativa")
-  ativo           Boolean @default(true)
+model AutomacoesConsultor {
+  id             String  @id @default(cuid())
+  nome           String
+  email          String  @unique
+  codigoPowerCRM String  @map("codigo_power_crm")
+  idCooperativa  String  @map("id_cooperativa")
+  ativo          Boolean @default(true)
 
-  criadoEm  DateTime @default(now()) @map("criado_em")
+  criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   @@index([ativo])
   @@index([idCooperativa])
-  @@map("consultores")
+  @@map("automacoes_consultores")
 }
 
-// ─── Configuracao ──────────────────────────────────────────────────────────────────────────
+// ─── AutomacoesConfiguracao ─────────────────────────────────────────────────────────────────
 // Configurações do sistema armazenadas no banco.
 // Usa o padrão chave-valor para flexibilidade.
 // Chave é única — usar upsert para atualizar.
 
-model Configuracao {
+model AutomacoesConfiguracao {
   id    String @id @default(cuid())
   chave String @unique
   valor String // JSON serializado para suportar qualquer tipo
 
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  @@map("configuracoes")
+  @@map("automacoes_configuracoes")
 }
 
 // ─── Enums ─────────────────────────────────────────────────────────────────────────────────

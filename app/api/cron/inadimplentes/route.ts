@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 2. Busca configurações
-    const registros = await prisma.configuracao.findMany({
+    const registros = await prisma.automacoesConfiguracao.findMany({
       where: {
         chave: {
           in: [

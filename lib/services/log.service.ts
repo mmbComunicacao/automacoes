@@ -34,7 +34,7 @@ export interface CriarLogParams {
  */
 export async function registrarLog(params: CriarLogParams): Promise<void> {
   try {
-    await prisma.log.create({
+    await prisma.automacoesLog.create({
       data: {
         automacao: params.automacao,
         integracao: params.integracao,

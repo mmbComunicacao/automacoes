@@ -12,20 +12,20 @@ export async function GET() {
   try {
     const [total, sucesso, falhas, totalAssociados, ultimoLog] = await Promise.all([
       // Total de logs de sucesso + erro (exclui INFO que são logs de sistema)
-      prisma.log.count({
+      prisma.automacoesLog.count({
         where: {
           automacao: AutomacaoTipo.INATIVOS,
           nivel: { in: [NivelLog.SUCESSO, NivelLog.ERRO] },
         },
       }),
-      prisma.log.count({
+      prisma.automacoesLog.count({
         where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.SUCESSO },
       }),
-      prisma.log.count({
+      prisma.automacoesLog.count({
         where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.ERRO },
       }),
       // CPFs únicos processados = controle de duplicidade
-      prisma.log.findMany({
+      prisma.automacoesLog.findMany({
         where: {
           automacao: AutomacaoTipo.INATIVOS,
           cpfAssociado: { not: null },
@@ -33,7 +33,7 @@ export async function GET() {
         select: { cpfAssociado: true },
         distinct: ["cpfAssociado"],
       }),
-      prisma.log.findFirst({
+      prisma.automacoesLog.findFirst({
         where: { automacao: AutomacaoTipo.INATIVOS },
         orderBy: { criadoEm: "desc" },
         select: { criadoEm: true },
