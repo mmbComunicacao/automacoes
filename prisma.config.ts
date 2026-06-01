@@ -2,14 +2,22 @@
  * prisma.config.ts — Prisma 7
  *
  * No Prisma 7, a datasource é configurada aqui (não mais no schema.prisma).
- * - DIRECT_URL : conexão direta ao banco (sem PgBouncer) — usada para migrations e db push
- * - DATABASE_URL: connection pooling via PgBouncer — usada em runtime pelo Prisma Client
  *
- * Nota: o Prisma 7 não aceita `directUrl` no defineConfig — apenas `url`.
- * O Prisma Client em runtime usa a DATABASE_URL do .env automaticamente.
+ * Schema do banco: "automacoes"
+ * O parâmetro `search_path` na connection string aponta o Prisma para o schema
+ * correto. Sem isso, ele usaria o schema "public" por padrão.
+ *
+ * - DIRECT_URL : conexão direta (sem PgBouncer) — usada para migrations e db push
+ * - DATABASE_URL: connection pooling via PgBouncer — usada em runtime pelo adapter
  */
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
+
+// Injeta search_path=automacoes na URL direta para que o Prisma
+// opere no schema correto ao rodar migrations ou db push
+const directUrlWithSchema = process.env.DIRECT_URL
+  ? `${process.env.DIRECT_URL}&search_path=automacoes`
+  : undefined;
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -17,7 +25,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    // Conexão direta para migrations (evita timeout do PgBouncer)
-    url: process.env.DIRECT_URL!,
+    url: directUrlWithSchema!,
   },
 });
