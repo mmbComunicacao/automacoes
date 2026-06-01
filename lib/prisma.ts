@@ -33,8 +33,9 @@ function createPrismaClient(): PrismaClient {
   }
 
   // Pool de conexões via pg — o PrismaPg adapter faz a ponte com o Prisma 7
+  // O options.schema aponta o Prisma para o schema "automacoes" em runtime
   const pool = new Pool({ connectionString });
-  const adapter = new PrismaPg(pool);
+  const adapter = new PrismaPg(pool, { schema: "automacoes" });
 
   return new PrismaClient({ adapter });
 }
