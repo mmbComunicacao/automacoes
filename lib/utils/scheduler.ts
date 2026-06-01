@@ -18,7 +18,7 @@ export async function isBusinessDay(date: Date): Promise<boolean> {
   const endOfDay = new Date(date);
   endOfDay.setHours(23, 59, 59, 999);
 
-  const feriado = await prisma.feriado.findFirst({
+  const feriado = await prisma.automacoesFeriado.findFirst({
     where: {
       data: {
         gte: startOfDay,
@@ -46,7 +46,7 @@ export async function hasEnoughTimePassed(
   automacao: "INATIVOS" | "INADIMPLENTES",
   intervaloMinutos: number
 ): Promise<boolean> {
-  const lastLog = await prisma.log.findFirst({
+  const lastLog = await prisma.automacoesLog.findFirst({
     where: {
       automacao,
       execucaoManual: false,

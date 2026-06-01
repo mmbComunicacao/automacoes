@@ -42,13 +42,13 @@ export async function GET(req: NextRequest) {
 
     // Busca logs e total em paralelo para performance
     const [logs, total] = await Promise.all([
-      prisma.log.findMany({
+      prisma.automacoesLog.findMany({
         where,
         orderBy: { criadoEm: "desc" },
         skip,
         take: limit,
       }),
-      prisma.log.count({ where }),
+      prisma.automacoesLog.count({ where }),
     ]);
 
     return NextResponse.json({

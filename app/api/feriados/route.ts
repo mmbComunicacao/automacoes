@@ -26,7 +26,7 @@ const importarFeriadosSchema = z.object({
 
 export async function GET() {
   try {
-    const feriados = await prisma.feriado.findMany({
+    const feriados = await prisma.automacoesFeriado.findMany({
       orderBy: { data: "asc" },
     });
 
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Usa createMany com skipDuplicates para ignorar feriados já cadastrados
-      const result = await prisma.feriado.createMany({
+      const result = await prisma.automacoesFeriado.createMany({
         data: parsed.data.feriados.map((f) => ({
           data: new Date(f.data),
           descricao: f.descricao,
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const feriado = await prisma.feriado.create({
+    const feriado = await prisma.automacoesFeriado.create({
       data: {
         data: new Date(parsed.data.data),
         descricao: parsed.data.descricao,

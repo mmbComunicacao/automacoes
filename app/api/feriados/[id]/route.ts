@@ -12,7 +12,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await prisma.feriado.delete({ where: { id } });
+    await prisma.automacoesFeriado.delete({ where: { id } });
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

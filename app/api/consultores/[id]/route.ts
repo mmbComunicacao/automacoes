@@ -32,7 +32,7 @@ export async function PATCH(
       );
     }
 
-    const consultor = await prisma.consultor.update({
+    const consultor = await prisma.automacoesConsultor.update({
       where: { id },
       data: parsed.data,
     });
@@ -54,7 +54,7 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    await prisma.consultor.delete({ where: { id } });
+    await prisma.automacoesConsultor.delete({ where: { id } });
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

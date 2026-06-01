@@ -33,7 +33,7 @@ const salvarConfiguracoesSchema = z.record(
 
 export async function GET() {
   try {
-    const registros = await prisma.configuracao.findMany();
+    const registros = await prisma.automacoesConfiguracao.findMany();
 
     // Converte o array de {chave, valor} para um objeto plano
     // O valor é deserializado do JSON string
@@ -68,7 +68,7 @@ export async function PUT(req: NextRequest) {
 
     // Upsert de cada configuração — cria se não existir, atualiza se existir
     const operacoes = Object.entries(parsed.data).map(([chave, valor]) =>
-      prisma.configuracao.upsert({
+      prisma.automacoesConfiguracao.upsert({
         where: { chave },
         create: { chave, valor: JSON.stringify(valor) },
         update: { valor: JSON.stringify(valor) },

@@ -17,7 +17,7 @@ const criarConsultorSchema = z.object({
 
 export async function GET() {
   try {
-    const consultores = await prisma.consultor.findMany({
+    const consultores = await prisma.automacoesConsultor.findMany({
       orderBy: { criadoEm: "desc" },
     });
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const consultor = await prisma.consultor.create({
+    const consultor = await prisma.automacoesConsultor.create({
       data: {
         nome: parsed.data.nome,
         email: parsed.data.email,

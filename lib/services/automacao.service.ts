@@ -48,7 +48,7 @@ export async function executarAutomacaoInativos(
     const resultados = await Promise.all(
       associados.map(async (associado) => {
         try {
-          const associadoDb = await prisma.associado.upsert({
+          const associadoDb = await prisma.automacoesAssociado.upsert({
             where: { cpf: associado.cpf },
             create: {
               cpf: associado.cpf,
@@ -69,7 +69,7 @@ export async function executarAutomacaoInativos(
           const hoje = new Date();
           hoje.setHours(0, 0, 0, 0);
 
-          const statusExistente = await prisma.associadoStatus.findFirst({
+          const statusExistente = await prisma.automacoesAssociadoStatus.findFirst({
             where: {
               associadoId: associadoDb.id,
               situacao: SituacaoAssociado.INATIVO,
@@ -78,7 +78,7 @@ export async function executarAutomacaoInativos(
           });
 
           if (!statusExistente) {
-            await prisma.associadoStatus.create({
+            await prisma.automacoesAssociadoStatus.create({
               data: {
                 associadoId: associadoDb.id,
                 situacao: SituacaoAssociado.INATIVO,
