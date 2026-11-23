@@ -4,51 +4,55 @@
  * Retorna as métricas da automação de clientes inativos a partir dos logs reais.
  */
 
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { NivelLog, AutomacaoTipo } from "@/lib/generated/prisma/enums";
+import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { NivelLog, AutomacaoTipo } from '@/lib/generated/prisma/enums'
 
 export async function GET() {
   try {
-    const [total, sucesso, falhas, totalAssociados, ultimoLog] = await Promise.all([
-      // Total de logs de sucesso + erro (exclui INFO que são logs de sistema)
-      prisma.automacoesLog.count({
-        where: {
-          automacao: AutomacaoTipo.INATIVOS,
-          nivel: { in: [NivelLog.SUCESSO, NivelLog.ERRO] },
-        },
-      }),
-      prisma.automacoesLog.count({
-        where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.SUCESSO },
-      }),
-      prisma.automacoesLog.count({
-        where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.ERRO },
-      }),
-      // CPFs únicos processados = controle de duplicidade
-      prisma.automacoesLog.findMany({
-        where: {
-          automacao: AutomacaoTipo.INATIVOS,
-          cpfAssociado: { not: null },
-        },
-        select: { cpfAssociado: true },
-        distinct: ["cpfAssociado"],
-      }),
-      prisma.automacoesLog.findFirst({
-        where: { automacao: AutomacaoTipo.INATIVOS },
-        orderBy: { criadoEm: "desc" },
-        select: { criadoEm: true },
-      }),
-    ]);
+    const [total, sucesso, falhas, totalAssociados, ultimoLog] =
+      await Promise.all([
+        // Total de logs de sucesso + erro (exclui INFO que são logs de sistema)
+        prisma.automacoesLog.count({
+          where: {
+            automacao: AutomacaoTipo.INATIVOS,
+            nivel: { in: [NivelLog.SUCESSO, NivelLog.ERRO] }
+          }
+        }),
+        prisma.automacoesLog.count({
+          where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.SUCESSO }
+        }),
+        prisma.automacoesLog.count({
+          where: { automacao: AutomacaoTipo.INATIVOS, nivel: NivelLog.ERRO }
+        }),
+        // CPFs únicos processados = controle de duplicidade
+        prisma.automacoesLog.findMany({
+          where: {
+            automacao: AutomacaoTipo.INATIVOS,
+            cpfAssociado: { not: null }
+          },
+          select: { cpfAssociado: true },
+          distinct: ['cpfAssociado']
+        }),
+        prisma.automacoesLog.findFirst({
+          where: { automacao: AutomacaoTipo.INATIVOS },
+          orderBy: { criadoEm: 'desc' },
+          select: { criadoEm: true }
+        })
+      ])
 
     return NextResponse.json({
       total,
       sucesso,
       falhas,
       duplicatas: totalAssociados.length, // CPFs únicos processados
-      ultimaExecucao: ultimoLog?.criadoEm ?? null,
-    });
+      ultimaExecucao: ultimoLog?.criadoEm ?? null
+    })
   } catch (err) {
-    console.error("[GET /api/inativos/metricas]", err);
-    return NextResponse.json({ erro: "Erro ao buscar métricas" }, { status: 500 });
+    console.error('[GET /api/inativos/metricas]', err)
+    return NextResponse.json(
+      { erro: 'Erro ao buscar métricas' },
+      { status: 500 }
+    )
   }
 }
